@@ -1,35 +1,52 @@
 <?php
-require 'vendor/autoload.php';
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 
-use MicrosoftAzure\Storage\Table\TableRestProxy;
-use MicrosoftAzure\Storage\Table\Models\Entity;
-use MicrosoftAzure\Storage\Table\Models\EdmType;
-use MicrosoftAzure\Storage\Table\Models\EntityProperty;
-
+// Configuración
 $accountName = getenv('ACCOUNT_NAME');
-$accountKey = getenv('ACCOUNT_KEY');
-
-$connectionString = "DefaultEndpointsProtocol=https;AccountName=$accountName;AccountKey=$accountKey;TableEndpoint=https://$accountName.table.core.windows.net/";
-$tableClient = TableRestProxy::createTableService($connectionString);
-
+$sasToken = getenv('ACCOUNT_SAS'); // ⚠️ NUEVA VARIABLE DE ENTORNO
 $tableName = "ShoppingList";
-
 $item = $_POST['item'] ?? '';
-$quantity = $_POST['quantity'] ?? 0;
+$quantity = $_POST['quantity'] ?? '';
 
-if ($item && $quantity) {
-    $entity = new Entity();
-    $entity->setPartitionKey("shopping");
-    $entity->setRowKey($item);
-    $entity->addProperty("quantity", EntityProperty::createEntityPropertyForInt32((int)$quantity));
-
-    try {
-        $tableClient->insertOrMergeEntity($tableName, $entity);
-    } catch (Exception $e) {
-        echo "Error: " . $e->getMessage();
-        exit;
-    }
+if ($item === '' || !is_numeric($quantity)) {
+    echo "Faltan datos válidos.";
+    exit;
 }
 
-header("Location: index.php");
-exit;
+$entity = [
+    'PartitionKey' => 'shopping',
+    'RowKey' => preg_replace('/[\/\\\\#\?\[\]]/', '_', $item),
+    'quantity' => (int)$quantity
+];
+
+$body = json_encode($entity);
+$date = gmdate('D, d M Y H:i:s T');
+
+// Construir URL con token SAS
+$url = "https://$accountName.table.core.windows.net/$tableName?$sasToken";
+
+$ch = curl_init($url);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    "Accept: application/json",
+    "Content-Type: application/json",
+    "x-ms-date: $date",
+    "x-ms-version: 2019-02-02",
+    "DataServiceVersion: 3.0;NetFx",
+    "MaxDataServiceVersion: 3.0;NetFx"
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+if ($httpCode >= 200 && $httpCode < 300) {
+    header("Location: /");
+    exit;
+} else {
+    echo "<h3>Error al insertar entidad</h3>";
+    echo "<pre>HTTP $httpCode\n$response</pre>";
+}
