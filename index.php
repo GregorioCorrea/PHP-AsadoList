@@ -15,7 +15,6 @@ $tableName = "ShoppingList";
 $filter = "PartitionKey eq 'shopping'";
 $result = $tableClient->queryEntities($tableName, $filter);
 $entities = $result->getEntities();
-
 ?>
 
 <!DOCTYPE html>
@@ -37,13 +36,19 @@ $entities = $result->getEntities();
 
     <ul class="list-group">
         <?php foreach ($entities as $entity): ?>
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <?= htmlspecialchars($entity->getRowKey()) ?>
-                <span class="badge badge-primary badge-pill"><?= $entity->getProperty("quantity")->getValue() ?></span>
-                <form action="delete.php" method="POST" class="ml-3 d-inline">
-                    <input type="hidden" name="rowkey" value="<?= htmlspecialchars($entity->getRowKey()) ?>">
-                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
-                </form>
+            <li class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <span><?= htmlspecialchars($entity->getRowKey()) ?></span>
+                        <span class="badge badge-primary badge-pill ml-2">
+                            <?= $entity->getProperty("quantity")->getValue() ?>
+                        </span>
+                    </div>
+                    <form action="delete.php" method="POST" class="m-0">
+                        <input type="hidden" name="item" value="<?= htmlspecialchars($entity->getRowKey()) ?>">
+                        <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                    </form>
+                </div>
             </li>
         <?php endforeach; ?>
     </ul>
