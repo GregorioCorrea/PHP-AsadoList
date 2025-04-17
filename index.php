@@ -40,6 +40,10 @@ $entities = $result->getEntities();
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 <?= htmlspecialchars($entity->getRowKey()) ?>
                 <span class="badge badge-primary badge-pill"><?= $entity->getProperty("quantity")->getValue() ?></span>
+                <form action="delete.php" method="POST" class="ml-3 d-inline">
+                    <input type="hidden" name="rowkey" value="<?= htmlspecialchars($entity->getRowKey()) ?>">
+                    <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+                </form>
             </li>
         <?php endforeach; ?>
     </ul>
