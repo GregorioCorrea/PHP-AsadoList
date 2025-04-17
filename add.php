@@ -1,52 +1,40 @@
 <?php
+require 'vendor/autoload.php';
+
+use MicrosoftAzure\Storage\Table\TableRestProxy;
+use MicrosoftAzure\Storage\Table\Models\Entity;
+use MicrosoftAzure\Storage\Table\Models\EdmType;
+
 ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Configuración
 $accountName = getenv('ACCOUNT_NAME');
-$sasToken = getenv('ACCOUNT_SAS'); // ⚠️ NUEVA VARIABLE DE ENTORNO
+$accountKey = getenv('ACCOUNT_KEY');
 $tableName = "ShoppingList";
+
 $item = $_POST['item'] ?? '';
 $quantity = $_POST['quantity'] ?? '';
 
 if ($item === '' || !is_numeric($quantity)) {
-    echo "Faltan datos válidos.";
+    echo "Error: Falta nombre del ítem o cantidad inválida.";
     exit;
 }
 
-$entity = [
-    'PartitionKey' => 'shopping',
-    'RowKey' => preg_replace('/[\/\\\\#\?\[\]]/', '_', $item),
-    'quantity' => (int)$quantity
-];
+$connectionString = "DefaultEndpointsProtocol=https;AccountName=$accountName;AccountKey=$accountKey;TableEndpoint=https://$accountName.table.core.windows.net/";
+$tableClient = TableRestProxy::createTableService($connectionString);
 
-$body = json_encode($entity);
-$date = gmdate('D, d M Y H:i:s T');
+$entity = new Entity();
+$entity->setPartitionKey("shopping");
+$entity->setRowKey(preg_replace('/[\/\\\\#\?\[\]]/', '_', $item));
 
-// Construir URL con token SAS
-$url = "https://$accountName.table.core.windows.net/$tableName?$sasToken";
+// ✅ Forma correcta y soportada en tu versión
+$entity->addProperty("quantity", EdmType::INT32, (int)$quantity);
 
-$ch = curl_init($url);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "Accept: application/json",
-    "Content-Type: application/json",
-    "x-ms-date: $date",
-    "x-ms-version: 2019-02-02",
-    "DataServiceVersion: 3.0;NetFx",
-    "MaxDataServiceVersion: 3.0;NetFx"
-]);
-
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
-if ($httpCode >= 200 && $httpCode < 300) {
+try {
+    $tableClient->insertOrMergeEntity($tableName, $entity);
     header("Location: /");
     exit;
-} else {
+} catch (Exception $e) {
     echo "<h3>Error al insertar entidad</h3>";
-    echo "<pre>HTTP $httpCode\n$response</pre>";
+    echo "<pre>" . $e . "</pre>";
 }
